@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Личный сайт — начинающий разработчик</title>
+    <meta name="description" content="Личный сайт начинающего разработчика: путь в IT + AI." />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main>
+      <section class="hero" aria-label="Hero секция">
+        <!-- Декоративные элементы фона для автономных анимаций -->
+        <div class="hero__bg">
+          <div class="hero__orb hero__orb--1"></div>
+          <div class="hero__orb hero__orb--2"></div>
+          <div class="hero__orb hero__orb--3"></div>
+          <div class="hero__particle hero__particle--1"></div>
+          <div class="hero__particle hero__particle--2"></div>
+          <div class="hero__particle hero__particle--3"></div>
+        </div>
+
+        <!-- Градиент, который следует за курсором -->
+        <div class="hero__cursor-gradient" id="cursorGradient"></div>
+
+        <div class="hero__container">
+          <p class="hero__kicker">Мой путь в IT + AI</p>
+
+          <h1 class="hero__title">Иван Петров</h1>
+
+          <p class="hero__bio">
+            Начинающий разработчик: учусь каждый день и собираю проекты в портфолио.
+            Интересуюсь веб-разработкой и тем, как AI помогает писать код быстрее и лучше.
+          </p>
+
+          <a class="hero__cta" href="#skills">Мои навыки</a>
+        </div>
+      </section>
+
+      <section class="skills" id="skills" aria-label="Мои навыки">
+        <div class="skills__container">
+          <h2 class="skills__title">Мои навыки</h2>
+          <div class="skills__grid" id="skills-grid"></div>
+          <button class="skills__add-btn" id="add-skill-btn" type="button">Добавить навык</button>
+        </div>
+      </section>
+
+      <section class="skill-index" id="skill-index" aria-label="Мой индекс навыков">
+        <div class="skill-index__container">
+          <h2 class="skill-index__title">Мой индекс навыков</h2>
+          
+          <div class="skill-index__card">
+            <div class="skill-index__sliders-wrapper">
+              <div class="skill-index__sliders">
+                <div class="skill-index__slider-item">
+                  <label class="skill-index__label" for="skill-html">HTML</label>
+                  <input 
+                    type="range" 
+                    id="skill-html" 
+                    class="skill-index__range" 
+                    min="0" 
+                    max="100" 
+                    value="0"
+                    data-skill="html"
+                  />
+                  <output class="skill-index__output" for="skill-html">0%</output>
+                </div>
+
+                <div class="skill-index__slider-item">
+                  <label class="skill-index__label" for="skill-css">CSS</label>
+                  <input 
+                    type="range" 
+                    id="skill-css" 
+                    class="skill-index__range" 
+                    min="0" 
+                    max="100" 
+                    value="0"
+                    data-skill="css"
+                  />
+                  <output class="skill-index__output" for="skill-css">0%</output>
+                </div>
+
+                <div class="skill-index__slider-item">
+                  <label class="skill-index__label" for="skill-js">JS</label>
+                  <input 
+                    type="range" 
+                    id="skill-js" 
+                    class="skill-index__range" 
+                    min="0" 
+                    max="100" 
+                    value="0"
+                    data-skill="js"
+                  />
+                  <output class="skill-index__output" for="skill-js">0%</output>
+                </div>
+
+                <div class="skill-index__slider-item">
+                  <label class="skill-index__label" for="skill-ts">TypeScript</label>
+                  <input 
+                    type="range" 
+                    id="skill-ts" 
+                    class="skill-index__range" 
+                    min="0" 
+                    max="100" 
+                    value="0"
+                    data-skill="ts"
+                  />
+                  <output class="skill-index__output" for="skill-ts">0%</output>
+                </div>
+
+                <div class="skill-index__slider-item">
+                  <label class="skill-index__label" for="skill-react">React/Vue</label>
+                  <input 
+                    type="range" 
+                    id="skill-react" 
+                    class="skill-index__range" 
+                    min="0" 
+                    max="100" 
+                    value="0"
+                    data-skill="react"
+                  />
+                  <output class="skill-index__output" for="skill-react">0%</output>
+                </div>
+
+                <div class="skill-index__slider-item">
+                  <label class="skill-index__label" for="skill-llm">LLM/Нейросети</label>
+                  <input 
+                    type="range" 
+                    id="skill-llm" 
+                    class="skill-index__range" 
+                    min="0" 
+                    max="100" 
+                    value="0"
+                    data-skill="llm"
+                  />
+                  <output class="skill-index__output" for="skill-llm">0%</output>
+                </div>
+              </div>
+            </div>
+
+            <div class="skill-index__result">
+              <div class="skill-index__gauge-wrapper">
+                <div class="skill-index__gauge-label">Итоговый уровень</div>
+                <div class="skill-index__gauge">
+                  <div class="skill-index__gauge-fill" id="gauge-fill"></div>
+                </div>
+                <div class="skill-index__gauge-value" id="gauge-value">0%</div>
+              </div>
+              <div class="skill-index__description" id="skill-description">
+                Начинающий, верный старт
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="contact" id="contact" aria-label="Связаться со мной">
+        <div class="contact__container">
+          <h2 class="contact__title">Связаться со мной</h2>
+          <p class="contact__text">
+            Если тебе откликается мой путь в IT и AI — напиши мне в Telegram.
+          </p>
+
+          <a
+            class="contact__btn"
+            href="https://t.me/yuragms"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <span class="contact__btn-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" class="contact__btn-icon-svg">
+                <path
+                  d="M9.17 14.89L9 18l2.2-2.16 3.92 2.87c.45.26 1.03.03 1.17-.47L18.96 6.5c.16-.57-.38-1.08-.93-.9L3.8 10.43c-.62.2-.64 1.04-.02 1.27l3.57 1.35 8.27-5.17-6.45 6.3z"
+                  fill="currentColor"
+                />
+              </svg>
+            </span>
+            <span class="contact__btn-label">Связаться со мной в Telegram</span>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <script src="./script.js" defer></script>
+  </body>
+</html>
+
