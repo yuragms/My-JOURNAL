@@ -23,13 +23,15 @@ ls -la /Users/yuragms/Cursor-cash/s24/app/src/main/assets/models
 | `face_det.onnx` | InsightFace SCRFD (детекция лица) |
 | `face_rec.onnx` | InsightFace ArcFace (эмбеддинг лица) |
 | `body_reid.onnx` | OSNet x0_25 (эмбеддинг тела) |
-| `object_encoder.onnx` | MobileCLIP-S0 image encoder (эмбеддинг объекта) |
+| `object_encoder.onnx` | MobileNetV3-Small features (эмбеддинг объекта, 576-d) |
 
-## MobileCLIP image encoder
+## Объектный энкодер
 
-Экспортируется отдельно из репозитория `ml-mobileclip` / `open_clip` в файл
-`mobileclip_s0_image.onnx` (вход `1x3x256x256`, выход — вектор эмбеддинга), затем
-кладётся рядом и подхватывается `export_models.py` при повторном запуске.
+Используется `torchvision` MobileNetV3-Small (features + global pool) — лёгкая и
+надёжная замена MobileCLIP, не требует `open_clip`. Вход `1x3x256x256`, выход —
+вектор 576 чисел. Веса скачиваются автоматически при первом запуске скрипта.
+При желании можно заменить на MobileCLIP, экспортировав его image encoder в
+`object_encoder.onnx` с тем же входом и обновив размер вектора в коде.
 
 ## После экспорта
 

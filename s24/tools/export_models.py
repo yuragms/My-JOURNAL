@@ -20,10 +20,11 @@ def ensure_out() -> None:
 
 
 def export_yoloe() -> None:
-    """prompt-free YOLOE-26 small. Имя .pt актуализировать по релизу пакета."""
+    """prompt-free YOLOE-26 small (seg, встроенный словарь RAM++)."""
     from ultralytics import YOLO
 
-    candidates = ["yoloe-26s.pt", "yoloe-26s-pf.pt", "yoloe-11s-seg-pf.pt"]
+    # Реальные имена ассетов ultralytics: yoloe-26s-seg-pf.pt (prompt-free).
+    candidates = ["yoloe-26s-seg-pf.pt", "yoloe-11s-seg-pf.pt"]
     weights = next((c for c in candidates if Path(c).exists()), candidates[0])
     model = YOLO(weights)
     path = model.export(format="onnx", opset=17, dynamic=False, simplify=True)
@@ -45,8 +46,19 @@ def copy_insightface() -> None:
     print("face_det.onnx <-", det.name, "| face_rec.onnx <-", rec.name)
 
 
+def _consolidate(path: Path) -> None:
+    """Сливает внешние данные весов в один .onnx файл (для Android assets)."""
+    import onnx
+
+    model = onnx.load(str(path), load_external_data=True)
+    onnx.save_model(model, str(path), save_as_external_data=False)
+    data = Path(str(path) + ".data")
+    if data.exists():
+        data.unlink()
+
+
 def export_osnet() -> None:
-    """OSNet x0_25 ReID -> ONNX (вход 1x3x256x128)."""
+    """OSNet x0_25 ReID -> ONNX одним файлом (вход 1x3x256x128)."""
     import torch
     import torchreid
 
@@ -55,30 +67,59 @@ def export_osnet() -> None:
     )
     model.eval()
     dummy = torch.randn(1, 3, 256, 128)
+    out = OUT / "body_reid.onnx"
     torch.onnx.export(
         model,
         dummy,
-        str(OUT / "body_reid.onnx"),
+        str(out),
         input_names=["input"],
         output_names=["embedding"],
-        opset_version=17,
+        opset_version=12,
+        do_constant_folding=True,
+        dynamo=False,
     )
-    print("body_reid.onnx exported")
+    _consolidate(out)
+    print("body_reid.onnx exported (single file)")
 
 
 def export_object_encoder() -> None:
-    """MobileCLIP-S0 image encoder -> ONNX.
+    """Лёгкий объектный энкодер: torchvision MobileNetV3-Small features -> вектор.
 
-    Экспортируется отдельным скриптом open_clip/mobileclip в
-    mobileclip_s0_image.onnx; здесь только подхватываем готовый файл.
+    Заменяет MobileCLIP надёжной встроенной моделью (KISS, без open_clip).
+    Вход 1x3x256x256, выход — pooled-эмбеддинг (576 чисел).
     """
-    src = Path("mobileclip_s0_image.onnx")
-    if src.exists():
-        shutil.copy(src, OUT / "object_encoder.onnx")
-        print("object_encoder.onnx <-", src.name)
-    else:
-        print("WARN: mobileclip_s0_image.onnx не найден - экспортируйте отдельно "
-              "(см. README), затем перезапустите этот скрипт")
+    import torch
+    import torch.nn as nn
+    from torchvision.models import MobileNet_V3_Small_Weights, mobilenet_v3_small
+
+    base = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.IMAGENET1K_V1)
+
+    class Encoder(nn.Module):
+        def __init__(self, backbone: nn.Module) -> None:
+            super().__init__()
+            self.features = backbone.features
+            self.pool = nn.AdaptiveAvgPool2d(1)
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            x = self.features(x)
+            x = self.pool(x)
+            return torch.flatten(x, 1)
+
+    model = Encoder(base).eval()
+    dummy = torch.randn(1, 3, 256, 256)
+    out = OUT / "object_encoder.onnx"
+    torch.onnx.export(
+        model,
+        dummy,
+        str(out),
+        input_names=["input"],
+        output_names=["embedding"],
+        opset_version=12,
+        do_constant_folding=True,
+        dynamo=False,
+    )
+    _consolidate(out)
+    print("object_encoder.onnx exported (mobilenet_v3_small features)")
 
 
 def main() -> None:

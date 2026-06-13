@@ -38,9 +38,10 @@ python /Users/yuragms/Cursor-cash/s24/tools/export_models.py
 ls -la /Users/yuragms/Cursor-cash/s24/app/src/main/assets/models
 ```
 
-Должны появиться: `yoloe26s.onnx`, `face_det.onnx`, `face_rec.onnx`,
-`body_reid.onnx`, `object_encoder.onnx`. Подробности и про MobileCLIP — в
-`tools/README.md`.
+Должны появиться: `yoloe26s.onnx` (YOLOE-26 prompt-free seg),
+`face_det.onnx`/`face_rec.onnx` (InsightFace), `body_reid.onnx` (OSNet),
+`object_encoder.onnx` (MobileNetV3-Small features, 576-d — лёгкая замена
+MobileCLIP). Подробности — в `tools/README.md`.
 
 > После первого экспорта откройте модели в [netron](https://netron.app) и сверьте
 > имена/формы входов-выходов с Kotlin-обёртками (`OnnxModel`, `YoloeDetector`,
