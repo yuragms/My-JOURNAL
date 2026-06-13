@@ -9,7 +9,7 @@
 
     <application
         android:label="S24 Vision"
-        android:theme="@style/Theme.Material3.DynamicColors.DayNight"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:allowBackup="true"
         android:supportsRtl="true">
 
