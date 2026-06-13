@@ -14,7 +14,8 @@ class CpuMonitorParseTest {
 
     @Test
     fun parseProcStatLine() {
-        val line = "cpu  100 0 100 700 0 0 0 0 0 0"
+        // busy = 100+0+200 = 300, idle = 700+0, total = 1000
+        val line = "cpu  100 0 200 700 0 0 0 0 0 0"
         val s = CpuMonitor.parseProcStat(line)
         assertEquals(700L, s.idle)
         assertEquals(1000L, s.total)
