@@ -43,23 +43,33 @@ class ProfileStore(root: File) {
         }
     }
 
-    /** Создаёт профиль или добавляет эмбеддинги в существующий. */
+    /** Создаёт новый профиль. Не перезаписывает существующий. */
+    fun createEmbeddings(type: ProfileType, name: String, embs: List<FloatArray>): EnrollResult {
+        if (embs.isEmpty()) return EnrollResult.Empty("нет эмбеддингов")
+        if (exists(type, name)) return EnrollResult.AlreadyExists(name)
+        save(Profile(type, name, embs.toMutableList()))
+        return EnrollResult.Created(embs.size)
+    }
+
+    /** Добавляет эмбеддинги в уже существующий профиль. */
+    fun improveEmbeddings(type: ProfileType, name: String, embs: List<FloatArray>): EnrollResult {
+        if (embs.isEmpty()) return EnrollResult.Empty("нет эмбеддингов")
+        val existing = load(type, name) ?: return EnrollResult.NotFound(name)
+        val before = existing.embeddings.size
+        existing.embeddings.addAll(embs)
+        save(existing)
+        return EnrollResult.Improved(before, existing.embeddings.size)
+    }
+
+    /** @deprecated Авто-режим: создать или дополнить. Используйте create/improve явно. */
     fun addEmbeddings(
         type: ProfileType,
         name: String,
         embs: List<FloatArray>,
     ): EnrollResult {
         if (embs.isEmpty()) return EnrollResult.Empty("нет эмбеддингов")
-        val existing = load(type, name)
-        return if (existing == null) {
-            save(Profile(type, name, embs.toMutableList()))
-            EnrollResult.Created(embs.size)
-        } else {
-            val before = existing.embeddings.size
-            existing.embeddings.addAll(embs)
-            save(existing)
-            EnrollResult.Improved(before, existing.embeddings.size)
-        }
+        return if (exists(type, name)) improveEmbeddings(type, name, embs)
+        else createEmbeddings(type, name, embs)
     }
 
     fun list(type: ProfileType): List<String> =
@@ -69,4 +79,10 @@ class ProfileStore(root: File) {
             ?: emptyList()
 
     fun delete(type: ProfileType, name: String): Boolean = file(type, name).delete()
+
+    fun fileSizeBytes(type: ProfileType, name: String): Long =
+        file(type, name).takeIf { it.exists() }?.length() ?: 0L
+
+    fun sampleCount(type: ProfileType, name: String): Int =
+        load(type, name)?.embeddings?.size ?: 0
 }

@@ -2,38 +2,71 @@ package com.s24vision.app.vision
 
 import android.graphics.Bitmap
 import com.s24vision.app.core.math.Embeddings
+import com.s24vision.app.core.onnx.InferenceMetrics
 import com.s24vision.app.core.profiles.Profile
 import com.s24vision.app.core.profiles.ProfileStore
 import com.s24vision.app.core.profiles.ProfileType
+import com.s24vision.app.core.settings.BuiltinModels
+import com.s24vision.app.core.settings.RecognitionSettings
 
-data class Annotation(val det: Detection, val displayLabel: String)
+data class Annotation(
+    val det: Detection,
+    val displayLabel: String,
+    /** Стабильный trackId — один номер на протяжении видео/сессии для того же объекта. */
+    val boxIndex: Int,
+)
 
 /** Связывает детектор и распознаватели: кадр → список аннотаций с подписями. */
 class FramePipeline(
-    private val detector: YoloeDetector,
+    private val detector: CompositeDetector,
     private val face: FaceRecognizer,
     private val body: BodyRecognizer,
     private val obj: ObjectRecognizer,
     private val store: ProfileStore,
+    private val settings: RecognitionSettings,
     private val fusion: IdentityFusion,
-    private val confTh: Float = 0.4f,
+    private val confTh: Float = 0.45f,
     private val faceTh: Float = 0.45f,
     private val bodyTh: Float = 0.65f,
-    private val objTh: Float = 0.5f,
+    /** Порог для generic / drone-детектора. */
+    private val objTh: Float = 0.50f,
+    /** Переименовать конкретный класс YOLOE (стул, чашка…) только при очень похожем кропе. */
+    private val objRelabelTh: Float = 0.76f,
 ) {
+    private val personTracker = BoxTracker.persons()
+    private val objectTracker = BoxTracker.objects()
+
+    fun resetTrackers() {
+        personTracker.reset()
+        objectTracker.reset()
+    }
+
     fun process(bmp: Bitmap): List<Annotation> {
-        val faces = store.list(ProfileType.FACE).mapNotNull { store.load(ProfileType.FACE, it) }
-        val bodies = store.list(ProfileType.BODY).mapNotNull { store.load(ProfileType.BODY, it) }
-        val objs = store.list(ProfileType.OBJECT).mapNotNull { store.load(ProfileType.OBJECT, it) }
-        return detector.detect(bmp, confTh).map { d ->
-            val label = if (d.isPerson) {
-                personLabel(crop(bmp, d), faces, bodies)
-            } else {
-                objectLabel(crop(bmp, d), d, objs)
+        val t0 = System.nanoTime()
+        try {
+            val faces = enabledProfiles(ProfileType.FACE)
+            val bodies = enabledProfiles(ProfileType.BODY)
+            val objs = enabledProfiles(ProfileType.OBJECT)
+            val dets = detector.detect(bmp, confTh)
+            val out = ArrayList<Annotation>()
+            personTracker.update(dets.filter { it.isPerson }).forEach { t ->
+                val d = t.detection
+                out.add(Annotation(d, personLabel(crop(bmp, d), faces, bodies), t.trackId))
             }
-            Annotation(d, label)
+            objectTracker.update(dets.filter { !it.isPerson }).forEach { t ->
+                val d = t.detection
+                out.add(Annotation(d, objectLabel(crop(bmp, d), d, objs), t.trackId))
+            }
+            return out
+        } finally {
+            InferenceMetrics.lastMs = (System.nanoTime() - t0) / 1_000_000f
         }
     }
+
+    private fun enabledProfiles(type: ProfileType): List<Profile> =
+        store.list(type)
+            .filter { settings.isProfileEnabled(type, it) }
+            .mapNotNull { store.load(type, it) }
 
     private fun crop(bmp: Bitmap, d: Detection): Bitmap {
         val l = d.rect.left.toInt().coerceIn(0, bmp.width - 1)
@@ -54,8 +87,11 @@ class FramePipeline(
     }
 
     private fun personLabel(c: Bitmap, faces: List<Profile>, bodies: List<Profile>): String {
-        val fe = face.embed(c)
-        val be = body.embed(c)
+        val useFace = settings.isBuiltinEnabled(BuiltinModels.FACE) && faces.isNotEmpty()
+        val useBody = settings.isBuiltinEnabled(BuiltinModels.BODY) && bodies.isNotEmpty()
+        if (!useFace && !useBody) return "person"
+        val fe = if (useFace) face.embed(c) else null
+        val be = if (useBody) body.embed(c) else null
         val fm = bestPerName(fe, faces)
         val bm = bestPerName(be, bodies)
         val name = fm?.takeIf { it.second >= faceTh }?.first
@@ -68,8 +104,19 @@ class FramePipeline(
     }
 
     private fun objectLabel(c: Bitmap, d: Detection, objs: List<Profile>): String {
-        val m = obj.match(c, objs, objTh)
-        if (m != null) return m.first
-        return if (d.label == CocoLabels.GENERIC) "неопознанный объект" else d.label
+        val catalogLabel = if (d.label == ClassNames.GENERIC) "неопознанный объект" else d.label
+        if (!settings.isBuiltinEnabled(BuiltinModels.OBJECT_ENCODER) || objs.isEmpty()) {
+            return catalogLabel
+        }
+        val m = obj.bestMatch(c, objs) ?: return catalogLabel
+        if (m.second < requiredObjScore(d)) return catalogLabel
+        return if (d.label.equals("drone", ignoreCase = true)) "drone" else m.first
+    }
+
+    private fun requiredObjScore(d: Detection): Float = when {
+        d.label.equals("drone", ignoreCase = true) -> objTh
+        d.label == ClassNames.GENERIC -> objTh
+        DroneConfusion.isConfusable(d.label) -> objTh
+        else -> objRelabelTh
     }
 }

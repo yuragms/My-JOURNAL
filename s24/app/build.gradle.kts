@@ -13,7 +13,7 @@ android {
         minSdk = 28
         targetSdk = 35
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.1-ort"
     }
 
     buildFeatures { compose = true }
@@ -50,6 +50,10 @@ dependencies {
     implementation("androidx.camera:camera-video:$camerax")
 
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.0")
+
+    val media3 = "1.4.1"
+    implementation("androidx.media3:media3-exoplayer:$media3")
+    implementation("androidx.media3:media3-ui:$media3")
 
     testImplementation("junit:junit:4.13.2")
 }

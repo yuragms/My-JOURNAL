@@ -3,29 +3,36 @@ package com.s24vision.app.vision
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.RectF
-import com.s24vision.app.core.onnx.OnnxModel
+import com.s24vision.app.core.onnx.OnnxModelHolder
+import com.s24vision.app.core.settings.RecognitionSettings
 
 /**
- * Детектор на prompt-free YOLOE-26.
+ * Детектор на prompt-free YOLOE-26 (seg).
  *
- * ВНИМАНИЕ: точная форма выхода и раскладка (x1,y1,x2,y2,score,cls) фиксируются по
- * netron после экспорта (tools/export_models.py). Если экспорт даёт иной формат
- * (например [1, N, 6] или транспонированный), скорректируйте [decode].
+ * Откалибровано по реальному экспорту: вход `images [1,3,640,640]`,
+ * выход `output0 [1,300,38]`, где на детекцию идёт раскладка
+ * `[x1, y1, x2, y2, conf, cls, +32 коэф. масок]`; координаты — в пикселях
+ * входа 640; cls — id в словаре RAM++ (4585 классов), см. ClassNames.
+ * `output1` (прототипы масок) не используется.
  */
 class YoloeDetector(
     context: Context,
+    settings: RecognitionSettings,
     private val inputSize: Int = 640,
 ) {
-    private val model = OnnxModel(context, "yoloe26s.onnx")
+    private val model = OnnxModelHolder(context, "yoloe26s.onnx", settings)
+    private val classNames = ClassNames(context)
+    private val stride = 38
 
     fun detect(bitmap: Bitmap, confTh: Float): List<Detection> {
         val scaled = Bitmap.createScaledBitmap(bitmap, inputSize, inputSize, true)
         val input = bitmapToNchw(scaled)
-        val (out, shape) = model.run(
+        val (out, shape) = model.get().run(
             input,
             longArrayOf(1, 3, inputSize.toLong(), inputSize.toLong()),
         )
-        return decode(out, shape, bitmap.width, bitmap.height, confTh)
+        val raw = decode(out, shape, bitmap.width, bitmap.height, confTh)
+        return DetectionFilters.filter(DetectionFilters.nms(raw), bitmap.width, bitmap.height)
     }
 
     private fun bitmapToNchw(bmp: Bitmap): FloatArray {
@@ -45,8 +52,8 @@ class YoloeDetector(
     }
 
     /**
-     * Каркас под формат [n, 6] = (x1, y1, x2, y2, score, cls) в координатах входа
-     * [inputSize x inputSize]. Боксы масштабируются обратно к исходному кадру.
+     * Формат строки: `[x1, y1, x2, y2, conf, cls, ...масочные коэф.]`,
+     * координаты в пикселях входа [inputSize]. Боксы масштабируются к кадру.
      */
     private fun decode(
         out: FloatArray,
@@ -56,7 +63,6 @@ class YoloeDetector(
         confTh: Float,
     ): List<Detection> {
         val res = ArrayList<Detection>()
-        val stride = 6
         val n = out.size / stride
         val sx = ow.toFloat() / inputSize
         val sy = oh.toFloat() / inputSize
@@ -65,13 +71,12 @@ class YoloeDetector(
             val score = out[o + 4]
             if (score < confTh) continue
             val cls = out[o + 5].toInt()
-            val label = CocoLabels.nameOf(cls)
             res.add(
                 Detection(
                     rect = RectF(out[o] * sx, out[o + 1] * sy, out[o + 2] * sx, out[o + 3] * sy),
-                    label = label,
+                    label = classNames.nameOf(cls),
                     score = score,
-                    isPerson = label == "person",
+                    isPerson = classNames.isPerson(cls),
                 ),
             )
         }

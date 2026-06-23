@@ -12,6 +12,7 @@ cd /Users/yuragms/Cursor-cash/hikvision-test1
 source .venv/bin/activate
 pip install -U ultralytics
 python /Users/yuragms/Cursor-cash/s24/tools/export_models.py
+python /Users/yuragms/Cursor-cash/s24/tools/export_drone_model.py
 ls -la /Users/yuragms/Cursor-cash/s24/app/src/main/assets/models
 ```
 
@@ -20,6 +21,7 @@ ls -la /Users/yuragms/Cursor-cash/s24/app/src/main/assets/models
 | Файл | Модель |
 | --- | --- |
 | `yoloe26s.onnx` | YOLOE-26 small (prompt-free, локализация) |
+| `drone_det.onnx` | YOLO26n, 1 класс `drone` (HuggingFace, см. `export_drone_model.py`) |
 | `face_det.onnx` | InsightFace SCRFD (детекция лица) |
 | `face_rec.onnx` | InsightFace ArcFace (эмбеддинг лица) |
 | `body_reid.onnx` | OSNet x0_25 (эмбеддинг тела) |

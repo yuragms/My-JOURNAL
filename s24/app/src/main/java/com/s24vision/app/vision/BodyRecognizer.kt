@@ -3,12 +3,16 @@ package com.s24vision.app.vision
 import android.content.Context
 import android.graphics.Bitmap
 import com.s24vision.app.core.math.Embeddings
-import com.s24vision.app.core.onnx.OnnxModel
+import com.s24vision.app.core.onnx.OnnxModelHolder
+import com.s24vision.app.core.settings.RecognitionSettings
 
 /** OSNet ReID: эмбеддинг тела по кропу человека (вход 256x128, ImageNet-нормализация). */
-class BodyRecognizer(context: Context) {
+class BodyRecognizer(
+    context: Context,
+    settings: RecognitionSettings,
+) {
 
-    private val model = OnnxModel(context, "body_reid.onnx")
+    private val model = OnnxModelHolder(context, "body_reid.onnx", settings)
     private val w = 128
     private val h = 256
     private val mean = floatArrayOf(0.485f, 0.456f, 0.406f)
@@ -26,7 +30,7 @@ class BodyRecognizer(context: Context) {
             input[plane + i] = (((p shr 8 and 0xFF) / 255f) - mean[1]) / std[1]
             input[2 * plane + i] = (((p and 0xFF) / 255f) - mean[2]) / std[2]
         }
-        val (out, _) = model.run(input, longArrayOf(1, 3, h.toLong(), w.toLong()))
+        val (out, _) = model.get().run(input, longArrayOf(1, 3, h.toLong(), w.toLong()))
         return Embeddings.l2normalize(out)
     }
 

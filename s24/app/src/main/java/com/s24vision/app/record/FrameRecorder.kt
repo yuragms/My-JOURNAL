@@ -1,51 +1,54 @@
 package com.s24vision.app.record
 
+import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Rect
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
+import android.net.Uri
+import android.os.ParcelFileDescriptor
 import android.view.Surface
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
- * Кодирует последовательность Bitmap (уже с нарисованными боксами) в H.264 mp4.
+ * Кодирует последовательность Bitmap (уже с нарисованными боксами) в H.264 mp4
+ * и пишет результат в публичную папку Movies/S24Vision через MediaStore.
  * Рисуем кадр на input-Surface кодера и дренируем выход в MediaMuxer.
  *
  * Параметры (битрейт/частота кадров) можно подстроить после проверки на устройстве.
  */
 class FrameRecorder(
+    private val context: Context,
     private val width: Int,
     private val height: Int,
-    private val fps: Int = 15,
+    private val fps: Int = 30,
 ) {
     private lateinit var codec: MediaCodec
     private lateinit var muxer: MediaMuxer
     private lateinit var surface: Surface
+    private var pfd: ParcelFileDescriptor? = null
     private var trackIndex = -1
     private var muxerStarted = false
-    private var frameIndex = 0L
+    private var frameIndex = 0
     private val bufferInfo = MediaCodec.BufferInfo()
 
-    lateinit var outputFile: File
+    lateinit var outputUri: Uri
         private set
 
-    fun start(dir: File) {
-        dir.mkdirs()
-        val ts = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
-        outputFile = File(dir, "$ts.mp4")
+    fun start() {
+        frameIndex = 0
+        outputUri = Recordings.create(context, RecordingNames.now())
+        val fd = context.contentResolver.openFileDescriptor(outputUri, "rw")
+            ?: error("Не удалось открыть файл записи")
+        pfd = fd
 
         val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height).apply {
             setInteger(
                 MediaFormat.KEY_COLOR_FORMAT,
                 MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface,
             )
-            setInteger(MediaFormat.KEY_BIT_RATE, 6_000_000)
+            setInteger(MediaFormat.KEY_BIT_RATE, 4_000_000)
             setInteger(MediaFormat.KEY_FRAME_RATE, fps)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
         }
@@ -53,7 +56,7 @@ class FrameRecorder(
         codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         surface = codec.createInputSurface()
         codec.start()
-        muxer = MediaMuxer(outputFile.path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+        muxer = MediaMuxer(fd.fileDescriptor, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
     }
 
     fun encode(frame: Bitmap) {
@@ -101,5 +104,8 @@ class FrameRecorder(
         if (muxerStarted) runCatching { muxer.stop() }
         runCatching { muxer.release() }
         runCatching { surface.release() }
+        runCatching { pfd?.close() }
+        pfd = null
+        runCatching { Recordings.publish(context, outputUri) }
     }
 }

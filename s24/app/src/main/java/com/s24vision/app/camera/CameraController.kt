@@ -1,6 +1,7 @@
 package com.s24vision.app.camera
 
 import android.content.Context
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -11,12 +12,13 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import java.util.concurrent.Executors
 
-/** Управление CameraX: превью + покадровый анализ, переключение селфи/основная. */
+/** Управление CameraX: превью + покадровый анализ, переключение селфи/основная, зум. */
 class CameraController(private val context: Context) {
 
     private var useFront = false
     private val analysisExecutor = Executors.newSingleThreadExecutor()
     private var provider: ProcessCameraProvider? = null
+    private var camera: Camera? = null
 
     fun start(owner: LifecycleOwner, previewView: PreviewView, onFrame: (ImageProxy) -> Unit) {
         val future = ProcessCameraProvider.getInstance(context)
@@ -31,6 +33,16 @@ class CameraController(private val context: Context) {
         bind(owner, previewView, onFrame)
     }
 
+    fun currentZoomRatio(): Float =
+        camera?.cameraInfo?.zoomState?.value?.zoomRatio ?: 1f
+
+    fun setZoomRatio(ratio: Float) {
+        val cam = camera ?: return
+        val zoom = cam.cameraInfo.zoomState.value ?: return
+        val clamped = ratio.coerceIn(zoom.minZoomRatio, zoom.maxZoomRatio)
+        cam.cameraControl.setZoomRatio(clamped)
+    }
+
     private fun bind(owner: LifecycleOwner, previewView: PreviewView, onFrame: (ImageProxy) -> Unit) {
         val p = provider ?: return
         p.unbindAll()
@@ -43,6 +55,6 @@ class CameraController(private val context: Context) {
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .build()
             .also { it.setAnalyzer(analysisExecutor) { proxy -> onFrame(proxy) } }
-        p.bindToLifecycle(owner, selector, preview, analysis)
+        camera = p.bindToLifecycle(owner, selector, preview, analysis)
     }
 }

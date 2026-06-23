@@ -6,6 +6,11 @@
         android:required="true" />
 
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Чтение роликов из Movies/S24Vision (в т.ч. перенесённых и сторонних записей в папке). -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
 
     <application
         android:label="S24 Vision"
