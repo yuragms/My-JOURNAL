@@ -12,8 +12,8 @@ android {
         applicationId = "com.s24vision.app"
         minSdk = 28
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.1-ort"
+        versionCode = 3
+        versionName = "1.2.1"
     }
 
     buildFeatures { compose = true }

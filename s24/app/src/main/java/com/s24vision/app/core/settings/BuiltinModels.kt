@@ -31,10 +31,10 @@ object BuiltinModels {
         ),
         Info(
             id = DRONE_DET,
-            assets = "drone_det.onnx",
+            assets = "drone_det_{n,s,m,l}.onnx",
             titleRu = "Детектор дронов",
-            descriptionRu = "YOLO11s, специалист по классу drone",
-            sizeMb = 36.2f,
+            descriptionRu = "YOLO11 n–l, активный размер — в блоке выше (~220 MB все варианты в APK)",
+            sizeMb = 220f,
             accuracyHint = 0.72f,
         ),
         Info(

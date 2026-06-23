@@ -12,8 +12,9 @@ import com.s24vision.app.core.settings.RecognitionSettings
 data class Annotation(
     val det: Detection,
     val displayLabel: String,
-    /** Стабильный trackId — один номер на протяжении видео/сессии для того же объекта. */
     val boxIndex: Int,
+    /** Коэффициент распознавания (профиль) или уверенность детектора. */
+    val recognitionScore: Float,
 )
 
 /** Связывает детектор и распознаватели: кадр → список аннотаций с подписями. */
@@ -51,11 +52,13 @@ class FramePipeline(
             val out = ArrayList<Annotation>()
             personTracker.update(dets.filter { it.isPerson }).forEach { t ->
                 val d = t.detection
-                out.add(Annotation(d, personLabel(crop(bmp, d), faces, bodies), t.trackId))
+                val (label, score) = personLabel(crop(bmp, d), d, faces, bodies)
+                out.add(Annotation(d, label, t.trackId, score))
             }
             objectTracker.update(dets.filter { !it.isPerson }).forEach { t ->
                 val d = t.detection
-                out.add(Annotation(d, objectLabel(crop(bmp, d), d, objs), t.trackId))
+                val (label, score) = objectLabel(crop(bmp, d), d, objs)
+                out.add(Annotation(d, label, t.trackId, score))
             }
             return out
         } finally {
@@ -86,31 +89,31 @@ class FramePipeline(
         return best
     }
 
-    private fun personLabel(c: Bitmap, faces: List<Profile>, bodies: List<Profile>): String {
+    private fun personLabel(c: Bitmap, d: Detection, faces: List<Profile>, bodies: List<Profile>): Pair<String, Float> {
         val useFace = settings.isBuiltinEnabled(BuiltinModels.FACE) && faces.isNotEmpty()
         val useBody = settings.isBuiltinEnabled(BuiltinModels.BODY) && bodies.isNotEmpty()
-        if (!useFace && !useBody) return "person"
+        if (!useFace && !useBody) return "person" to d.score
         val fe = if (useFace) face.embed(c) else null
         val be = if (useBody) body.embed(c) else null
         val fm = bestPerName(fe, faces)
         val bm = bestPerName(be, bodies)
         val name = fm?.takeIf { it.second >= faceTh }?.first
             ?: bm?.takeIf { it.second >= bodyTh }?.first
-            ?: return "person"
+            ?: return "person" to d.score
         val faceS = if (fm?.first == name) fm.second else 0f
         val bodyS = if (bm?.first == name) bm.second else 0f
-        val total = fusion.total(faceS, bodyS)
-        return "%s face:%.2f body:%.2f total:%.2f".format(name, faceS, bodyS, total)
+        return name to fusion.total(faceS, bodyS)
     }
 
-    private fun objectLabel(c: Bitmap, d: Detection, objs: List<Profile>): String {
+    private fun objectLabel(c: Bitmap, d: Detection, objs: List<Profile>): Pair<String, Float> {
         val catalogLabel = if (d.label == ClassNames.GENERIC) "неопознанный объект" else d.label
         if (!settings.isBuiltinEnabled(BuiltinModels.OBJECT_ENCODER) || objs.isEmpty()) {
-            return catalogLabel
+            return catalogLabel to d.score
         }
-        val m = obj.bestMatch(c, objs) ?: return catalogLabel
-        if (m.second < requiredObjScore(d)) return catalogLabel
-        return if (d.label.equals("drone", ignoreCase = true)) "drone" else m.first
+        val m = obj.bestMatch(c, objs) ?: return catalogLabel to d.score
+        if (m.second < requiredObjScore(d)) return catalogLabel to d.score
+        val name = if (d.label.equals("drone", ignoreCase = true)) "drone" else m.first
+        return name to m.second
     }
 
     private fun requiredObjScore(d: Detection): Float = when {

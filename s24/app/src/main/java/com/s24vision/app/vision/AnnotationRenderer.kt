@@ -18,7 +18,8 @@ object AnnotationRenderer {
     private const val FILL_ALPHA = 0.22f
     private const val TEXT_ALPHA = 0.95f
 
-    fun caption(ann: Annotation): String = "#${ann.boxIndex} ${ann.displayLabel}"
+    fun caption(ann: Annotation): String =
+        "#${ann.boxIndex} ${ann.displayLabel} %.2f".format(ann.recognitionScore)
 
     fun drawOnBitmap(src: Bitmap, annos: List<Annotation>): Bitmap {
         val bmp = src.copy(Bitmap.Config.ARGB_8888, true)

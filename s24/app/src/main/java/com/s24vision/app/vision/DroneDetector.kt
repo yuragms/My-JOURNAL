@@ -3,12 +3,12 @@ package com.s24vision.app.vision
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.RectF
-import com.s24vision.app.core.onnx.OnnxModelHolder
+import com.s24vision.app.core.onnx.OnnxModel
 import com.s24vision.app.core.settings.RecognitionSettings
 
 /**
- * Специализированный детектор дронов (YOLO11s, 1 класс).
- * Веса: sapoepsilon/yolov11s-drone-detector (HuggingFace).
+ * Специализированный детектор дронов (YOLO11, 1 класс).
+ * Варианты n/s/m/l — assets/models/drone_det_*.onnx, выбор в Профилях.
  * ONNX: [1, 5, 8400] → cx, cy, w, h, conf в пикселях входа 640.
  * Старый формат [1, 300, 6] (end2end) тоже поддерживается.
  */
@@ -18,7 +18,10 @@ class DroneDetector(
     private val inputSize: Int = 640,
     private val confTh: Float = 0.25f,
 ) {
-    private val model = OnnxModelHolder(context, "drone_det.onnx", settings)
+    private val appContext = context.applicationContext
+    private val settings = settings
+    private var cached: OnnxModel? = null
+    private var cacheKey: String? = null
     private val end2EndStride = 6
     private val label = "drone"
 
@@ -26,7 +29,7 @@ class DroneDetector(
         val lb = YoloLetterbox.fit(bitmap, inputSize)
         val input = bitmapToNchw(lb.bitmap)
         if (lb.bitmap !== bitmap) lb.bitmap.recycle()
-        val (out, shape) = model.get().run(
+        val (out, shape) = activeModel().run(
             input,
             longArrayOf(1, 3, inputSize.toLong(), inputSize.toLong()),
         )
@@ -123,5 +126,34 @@ class DroneDetector(
         return Detection(rect = rect, label = label, score = score, isPerson = false)
     }
 
-    fun close() = model.close()
+    fun close() {
+        cached?.close()
+        cached = null
+        cacheKey = null
+    }
+
+    private fun activeModel(): OnnxModel {
+        val asset = resolveAsset(appContext, settings)
+        val key = "${settings.droneDetVariant().prefKey}:${settings.inferenceBackend().prefKey}:$asset"
+        val model = cached
+        if (model != null && cacheKey == key) return model
+        model?.close()
+        val next = OnnxModel(appContext, asset, settings.inferenceBackend())
+        cached = next
+        cacheKey = key
+        return next
+    }
+
+    companion object {
+        private fun resolveAsset(context: Context, settings: RecognitionSettings): String {
+            val file = settings.droneDetVariant().assetFile
+            return if (assetExists(context, file)) file else "drone_det_s.onnx"
+        }
+
+        private fun assetExists(context: Context, name: String): Boolean =
+            runCatching {
+                context.assets.open("models/$name").close()
+                true
+            }.getOrDefault(false)
+    }
 }

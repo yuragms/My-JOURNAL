@@ -18,6 +18,13 @@ class RecognitionSettings(context: Context) {
         prefs.edit().putString(KEY_INFERENCE_BACKEND, backend.prefKey).apply()
     }
 
+    fun droneDetVariant(): DroneDetVariant =
+        DroneDetVariant.fromPref(prefs.getString(KEY_DRONE_DET_VARIANT, DroneDetVariant.S.prefKey)!!)
+
+    fun setDroneDetVariant(variant: DroneDetVariant) {
+        prefs.edit().putString(KEY_DRONE_DET_VARIANT, variant.prefKey).apply()
+    }
+
     fun isBuiltinEnabled(id: String): Boolean =
         prefs.getBoolean(builtinKey(id), true)
 
@@ -63,5 +70,6 @@ class RecognitionSettings(context: Context) {
 
     companion object {
         private const val KEY_INFERENCE_BACKEND = "inference_backend"
+        private const val KEY_DRONE_DET_VARIANT = "drone_det_variant"
     }
 }

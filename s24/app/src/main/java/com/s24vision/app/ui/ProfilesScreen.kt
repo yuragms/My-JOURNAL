@@ -35,6 +35,7 @@ import com.s24vision.app.core.onnx.OnnxRuntimeStatus
 import com.s24vision.app.core.profiles.ProfileMetrics
 import com.s24vision.app.core.profiles.ProfileType
 import com.s24vision.app.core.settings.BuiltinModels
+import com.s24vision.app.core.settings.DroneDetVariant
 import com.s24vision.app.core.settings.RecognitionSettings
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -68,6 +69,10 @@ fun ProfilesScreen() {
 
         item {
             InferenceBackendSection(settings = settings, refresh = refresh, onChanged = { refresh++ })
+        }
+
+        item {
+            DroneDetVariantSection(settings = settings, refresh = refresh, onChanged = { refresh++ })
         }
 
         item {
@@ -137,6 +142,55 @@ fun ProfilesScreen() {
                         refresh++
                     }) { Text("Удалить") }
                 },
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DroneDetVariantSection(
+    settings: RecognitionSettings,
+    refresh: Int,
+    onChanged: () -> Unit,
+) {
+    val variant = remember(refresh) { settings.droneDetVariant() }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.45f)),
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Text("Размер drone_det (YOLO11)", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "n → l: сравните скорость и дальность на одной сцене",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.padding(top = 2.dp, bottom = 6.dp),
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                DroneDetVariant.entries.forEach { option ->
+                    FilterChip(
+                        selected = variant == option,
+                        onClick = {
+                            settings.setDroneDetVariant(option)
+                            onChanged()
+                        },
+                        label = { Text(option.titleRu) },
+                    )
+                }
+            }
+            Text(
+                "Файл: ${variant.assetFile} · ~${BuiltinModels.formatSizeMb(variant.sizeMbHint)}\n${variant.sourceHint}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
             )
         }
     }
