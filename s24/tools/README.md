@@ -12,7 +12,7 @@ cd /Users/yuragms/Cursor-cash/hikvision-test1
 source .venv/bin/activate
 pip install -U ultralytics
 python /Users/yuragms/Cursor-cash/s24/tools/export_models.py
-python /Users/yuragms/Cursor-cash/s24/tools/export_drone_model.py
+python /Users/yuragms/Cursor-cash/s24/tools/export_drone_models.py
 ls -la /Users/yuragms/Cursor-cash/s24/app/src/main/assets/models
 ```
 
@@ -21,11 +21,16 @@ ls -la /Users/yuragms/Cursor-cash/s24/app/src/main/assets/models
 | Файл | Модель |
 | --- | --- |
 | `yoloe26s.onnx` | YOLOE-26 small (prompt-free, локализация) |
-| `drone_det.onnx` | YOLO26n, 1 класс `drone` (HuggingFace, см. `export_drone_model.py`) |
+| `drone_det_n.onnx` | YOLO11n, 1 класс `drone` (HuggingFace) |
+| `drone_det_s.onnx` | YOLO11s, эталон (HuggingFace) |
+| `drone_det_m.onnx` / `drone_det_l.onnx` | YOLO11m/l, дообучение Seraphim mini |
 | `face_det.onnx` | InsightFace SCRFD (детекция лица) |
 | `face_rec.onnx` | InsightFace ArcFace (эмбеддинг лица) |
 | `body_reid.onnx` | OSNet x0_25 (эмбеддинг тела) |
 | `object_encoder.onnx` | MobileNetV3-Small features (эмбеддинг объекта, 576-d) |
+
+Скрипт `export_drone_models.py` — см. docstring: `--train-ml` только для m/l.
+Старый `export_drone_model.py` (один YOLO26n) оставлен для совместимости, в приложении не используется.
 
 ## Объектный энкодер
 

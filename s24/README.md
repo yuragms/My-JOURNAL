@@ -8,7 +8,8 @@
 ## Что умеет
 
 - GUI на Jetpack Compose, доступ к **обеим камерам** (селфи и основная).
-- Распознавание объектов в реальном времени (YOLOE-26, prompt-free) + **отдельный детектор дронов** (YOLO26n, HuggingFace).
+- Распознавание объектов в реальном времени (YOLOE-26, prompt-free) + **отдельный детектор дронов**
+  (YOLO11 n/s/m/l, выбор размера в **Профилях**).
 - Запись видео с нарисованными рамками в `Movies/S24Vision` при обнаружении объектов.
 - Распознавание людей: **SCRFD** (детекция лица в кропе) → выравнивание по **5 точкам** →
   **ArcFace**-эмбеддинг; тело — **OSNet ReID**. Имя по лицу только если лицо реально
@@ -21,8 +22,11 @@
   нет → «создан новый».
 - Оверлей нагрузки: CPU % и GPU % (GPU — best-effort, может быть `n/a`).
 - Экраны меню (Записи, Обучение, Профили) — **серый фон**, контрастнее со строкой уведомлений Android.
+- **Профили**: переключатель ORT (CPU / NNAPI), размер `drone_det`, список людей/объектов.
+- Подпись на рамке: `#N имя 0.67` — номер трека, имя и **коэффициент распознавания** (профиль или уверенность детектора).
 
-Установленное приложение на S24: **~171 MB** (из них ~76 MB — все ONNX-модели).
+Текущая версия: **1.2.1** (точка сохранения **4.1**). Debug APK с полным набором моделей: **~380 MB**
+(ONNX в assets ~290 MB, в т.ч. четыре варианта `drone_det_*`).
 
 ## Требования
 
@@ -42,7 +46,7 @@ cd /Users/yuragms/Cursor-cash/hikvision-test1
 source .venv/bin/activate
 pip install -U ultralytics huggingface_hub
 python /Users/yuragms/Cursor-cash/s24/tools/export_models.py
-python /Users/yuragms/Cursor-cash/s24/tools/export_drone_model.py
+python /Users/yuragms/Cursor-cash/s24/tools/export_drone_models.py
 ls -la /Users/yuragms/Cursor-cash/s24/app/src/main/assets/models
 ```
 
@@ -51,7 +55,9 @@ ls -la /Users/yuragms/Cursor-cash/s24/app/src/main/assets/models
 | Файл | Назначение | ~размер |
 |------|------------|---------|
 | `yoloe26s.onnx` | YOLOE-26 prompt-free (4585 классов RAM++) | 47 MB |
-| `drone_det.onnx` | Дроны, YOLO26n, 1 класс ([HF](https://huggingface.co/danivelikova/drone-detection-fred-yolo26n)) | 9 MB |
+| `drone_det_n.onnx` | Дроны, YOLO11n ([HF](https://huggingface.co/marie-kjelberg/drone-detector)) | 10 MB |
+| `drone_det_s.onnx` | Дроны, YOLO11s ([HF](https://huggingface.co/sapoepsilon/yolov11s-drone-detector), эталон) | 36 MB |
+| `drone_det_m.onnx` / `drone_det_l.onnx` | Дообучение Seraphim mini (400 кадров) | 77 / 97 MB |
 | `face_det.onnx` / `face_rec.onnx` | SCRFD + ArcFace | 2.4 / 13 MB |
 | `body_reid.onnx` | OSNet ReID | 0.9 MB |
 | `object_encoder.onnx` | MobileNetV3 (свои объекты) | 3.5 MB |
@@ -59,12 +65,17 @@ ls -la /Users/yuragms/Cursor-cash/s24/app/src/main/assets/models
 
 **Детектор дронов** работает параллельно с YOLOE: специалист находит `drone`,
 YOLOE — всё остальное; при пересечении боксов приоритет у `drone_det`.
-Пересобрать только дрон:
+Активный файл — в **Профили → Размер drone_det** (по умолчанию YOLO11s).
+На S24 для `drone_det` обычно быстрее **ORT CPU**, чем NNAPI (см. блок «ORT backend» в Профилях).
+
+Пересобрать только дроны:
 
 ```bash
 cd /Users/yuragms/Cursor-cash/hikvision-test1 && source .venv/bin/activate
-pip install -U ultralytics huggingface_hub
-python /Users/yuragms/Cursor-cash/s24/tools/export_drone_model.py
+pip install -U ultralytics huggingface_hub onnxslim
+python /Users/yuragms/Cursor-cash/s24/tools/export_drone_models.py
+# только m/l после дообучения:
+python /Users/yuragms/Cursor-cash/s24/tools/export_drone_models.py --train-ml
 ```
 
 Подробности — в `tools/README.md`.
@@ -187,9 +198,9 @@ adb shell am start -n com.s24vision.app/.ui.MainActivity
   Номер закрепляется за объектом на всём ролике (IoU-трекинг). Кнопки **Обучить** / **Дообучить**.
   Для людей: в профиль лица попадают только кадры, где SCRFD нашёл лицо (анфас/профиль).
   Во время обработки — прогресс %, CPU/GPU и имя потока.
-- **Камера**: полупрозрачные боксы с номерами; подпись `имя face:X.XX body:X.XX total:X.XX`
-  или `person`, если ни лицо, ни тело не прошли порог; сверху CPU/GPU и поток `camera-analysis`.
-- **Профили**: список людей/объектов, удаление.
+- **Камера**: полупрозрачные боксы с номерами; подпись `#N имя 0.67` (коэффициент распознавания)
+  или `#N person 0.45`, если профиль не прошёл порог; сверху CPU/GPU и поток `camera-analysis`.
+- **Профили**: ORT backend (CPU/NNAPI), размер YOLO11 для `drone_det`, список людей/объектов, удаление.
 
 ### Пороги распознавания (по умолчанию)
 
@@ -276,7 +287,7 @@ CameraX → YOLOE-26 (боксы, IoU-трекинг #N)
               │                              │
               │                    имя если face≥0.45 ИЛИ body≥0.65, иначе person
               │
-              ├─ drone_det (YOLO26n) ── merge с YOLOE, приоритет у специалиста
+              ├─ drone_det (YOLO11 n/s/m/l) ── merge с YOLOE, приоритет у специалиста
               │
               └─ объект → MobileNetV3 (object_encoder) → косинус с profiles/objects
 ```
@@ -284,3 +295,21 @@ CameraX → YOLOE-26 (боксы, IoU-трекинг #N)
 «Обучение» = сбор эмбеддингов из кадров видео (не тренировка весов). Распознавание
 = косинусная близость к сохранённым эмбеддингам. Та же парадигма, что в desktop-
 проекте `hikvision-test1`.
+
+---
+
+## 8. Локальные точки сохранения (не в git)
+
+Папка `.local-checkpoints/` в `.gitignore`. На Mac:
+
+| Точка | Содержимое |
+|-------|------------|
+| `4` | drone_det n/s/m/l, выбор в Профилях, APK 1.2-drone |
+| `4.1` | + коэффициент в подписи рамки, APK 1.2.1 |
+
+Восстановить исходники из 4.1:
+
+```bash
+rsync -a --delete --exclude '.local-checkpoints' \
+  .local-checkpoints/4.1/s24/ /Users/yuragms/Cursor-cash/s24/
+```
